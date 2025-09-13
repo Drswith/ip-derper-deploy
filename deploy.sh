@@ -16,6 +16,16 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# 检查系统是否支持apt包管理器
+if ! command -v apt-get >/dev/null 2>&1; then
+  echo "错误: 此脚本仅支持使用apt包管理器的系统（如Ubuntu、Debian等）"
+  echo "当前系统不支持apt-get命令，脚本将退出"
+  exit 1
+fi
+
+echo "系统检查通过: 检测到apt包管理器"
+echo ""
+
 # 获取当前用户（用于设置工作目录）
 if [ -z "$SUDO_USER" ]; then
   CURRENT_USER=$(whoami)
