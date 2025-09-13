@@ -1,0 +1,27 @@
+# ShellCheck configuration file
+# 禁用特定规则
+
+# SC1091: 不检查sourced文件是否存在（因为可能在运行时才存在）
+disable=SC1091
+
+# SC2034: 允许未使用的变量（某些变量可能在模板中使用）
+disable=SC2034
+
+# SC2086: 允许不带引号的变量扩展（在某些情况下是必要的）
+# disable=SC2086
+
+# SC2181: 允许检查$?而不是直接检查命令
+# disable=SC2181
+
+# SC2164: 允许cd不检查是否成功（在某些脚本中可能需要）
+# disable=SC2164
+
+# 启用所有可选检查
+enable=all
+
+# 设置shell类型
+shell=bash
+
+# 排除特定文件或目录
+# exclude-dir=vendor
+# exclude=*.bak

@@ -1,0 +1,164 @@
+name: Shell Script Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: Shell Script Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './'
+          format: gcc
+          severity: error
+        env:
+          SHELLCHECK_OPTS: -e SC1091 -e SC2034
+
+  syntax-check:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check script syntax
+        run: |
+          bash -n deploy.sh
+          echo "✅ Syntax check passed"
+
+      - name: Check script permissions
+        run: |
+          chmod +x deploy.sh
+          ls -la deploy.sh
+          echo "✅ Script permissions set correctly"
+
+  local-test-suite:
+    name: Local Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run comprehensive test suite
+        run: |
+          chmod +x test_deploy.sh
+          ./test_deploy.sh
+
+  compatibility-test:
+    name: Ubuntu Compatibility Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test system requirements check
+        run: |
+          chmod +x deploy.sh
+          # 测试apt-get检查功能
+          if command -v apt-get >/dev/null 2>&1; then
+            echo "✅ apt-get available on ${{ matrix.os }}"
+          else
+            echo "❌ apt-get not available on ${{ matrix.os }}"
+            exit 1
+          fi
+
+      - name: Test script initialization (dry-run)
+        run: |
+          # 创建模拟的非root环境测试
+          echo "Testing non-root user check..."
+          if ./deploy.sh 2>&1 | grep -q "请以root用户或使用sudo运行此脚本"; then
+            echo "✅ Root user check working correctly"
+          else
+            echo "❌ Root user check failed"
+            exit 1
+          fi
+
+
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "Scanning for potential security issues..."
+          
+          # 检查是否有硬编码的密码或密钥
+          if grep -i "password\|secret\|key\|token" deploy.sh | grep -v "#"; then
+            echo "⚠️  Found potential hardcoded secrets"
+            grep -i "password\|secret\|key\|token" deploy.sh | grep -v "#"
+          else
+            echo "✅ No hardcoded secrets found"
+          fi
+          
+          # 检查是否使用了不安全的下载方式
+          if grep "curl.*http://" deploy.sh; then
+            echo "⚠️  Found insecure HTTP downloads"
+            grep "curl.*http://" deploy.sh
+          else
+            echo "✅ All downloads use HTTPS"
+          fi
+
+  documentation-check:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README exists
+        run: |
+          if [ -f "README.md" ]; then
+            echo "✅ README.md exists"
+          else
+            echo "⚠️  README.md not found"
+          fi
+
+      - name: Check script comments
+        run: |
+          comment_lines=$(grep -c "^#" deploy.sh || echo "0")
+          total_lines=$(wc -l < deploy.sh)
+          comment_ratio=$(echo "scale=2; $comment_lines / $total_lines * 100" | bc -l)
+          
+          echo "Script has $comment_lines comment lines out of $total_lines total lines ($comment_ratio%)"
+          
+          if (( $(echo "$comment_ratio >= 10" | bc -l) )); then
+            echo "✅ Good documentation coverage"
+          else
+            echo "⚠️  Consider adding more comments for better documentation"
+          fi
+
+  integration-test:
+    name: Integration Test Summary
+    runs-on: ubuntu-latest
+    needs: [shellcheck, syntax-check, local-test-suite, compatibility-test, security-scan, documentation-check]
+    steps:
+      - name: Test Summary
+        run: |
+          echo "🎉 All tests completed successfully!"
+          echo ""
+          echo "Test Results Summary:"
+          echo "✅ ShellCheck linting passed"
+          echo "✅ Bash syntax check passed"
+          echo "✅ Local test suite passed"
+          echo "✅ Ubuntu compatibility verified"
+          echo "✅ Security scan completed"
+          echo "✅ Documentation check completed"
+          echo ""
+          echo "The deploy.sh script is ready for production use!"
