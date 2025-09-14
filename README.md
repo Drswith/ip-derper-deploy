@@ -5,14 +5,11 @@ ubuntu 一键部署 tailscale derp中继服务器脚本
 
 ### 快速部署
 ```bash
-# 下载脚本
-wget https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh
+# curl 一键部署命令
+curl -fsSL https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | bash
 
-# 添加执行权限
-chmod +x deploy.sh
-
-# 以root权限运行
-sudo ./deploy.sh
+# wget 一键部署命令
+wget -O deploy.sh https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh
 ```
 
 ### 系统要求

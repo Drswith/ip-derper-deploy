@@ -170,9 +170,20 @@ else
   echo ""
 fi
 
-# Step 5: 安装并登录Tailscale
+# Step 5: 拉取DERPER镜像
 echo ""
-echo ">>> Step 5: 安装并登录Tailscale"
+echo ">>> Step 5: 拉取DERPER镜像"
+echo ""
+echo "正在拉取DERPER镜像: $DERPER_IMAGE"
+echo "-----------------------------------------"
+sudo -u $CURRENT_USER docker pull $DERPER_IMAGE
+echo "-----------------------------------------"
+echo "Step 5 完成"
+echo ""
+
+# Step 6: 安装并登录Tailscale
+echo ""
+echo ">>> Step 6: 安装并登录Tailscale"
 echo ""
 echo "正在安装Tailscale..."
 echo "-----------------------------------------"
@@ -221,17 +232,6 @@ else
 fi
 
 echo ""
-echo "Step 5 完成"
-echo ""
-
-# Step 6: 拉取DERPER镜像
-echo ""
-echo ">>> Step 6: 拉取DERPER镜像"
-echo ""
-echo "正在拉取DERPER镜像: $DERPER_IMAGE"
-echo "-----------------------------------------"
-sudo -u $CURRENT_USER docker pull $DERPER_IMAGE
-echo "-----------------------------------------"
 echo "Step 6 完成"
 echo ""
 
