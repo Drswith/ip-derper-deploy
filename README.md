@@ -9,7 +9,7 @@ ubuntu 一键部署 tailscale derp中继服务器脚本
 curl -fsSL https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | bash
 ```
 ```bash
-# 镜像加速
+# curl 镜像加速
 curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | bash
 ```
 
@@ -18,7 +18,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-der
 wget -O deploy.sh https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh
 ```
 ```bash
-# 镜像加速
+# wget 镜像加速
 wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh
 ```
 
