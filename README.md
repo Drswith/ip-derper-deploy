@@ -27,6 +27,15 @@ wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith
 - root 权限或 sudo 权限
 - 网络连接正常
 
+### 前置准备
+- 打开服务器所属的防火墙，允许脚本配置的端口和协议通行
+  - DERP服务端口 默认 33445、33446 （tcp）
+  - HTTP端口 默认 80 （tcp）
+  - STUN端口 默认 3478、41641 （udp）
+
+- 警告：使用阿里云web控制台连接服务器时由于内网服务IP段与tailscale使用的IP网段冲突，会配置到中途失去响应。
+  - 解决方法：使用其他ssh工具连接到服务器执行脚本配置即可。
+
 ### 部署流程
 脚本将自动完成以下步骤：
 1. 系统环境检查（root权限、apt包管理器）
