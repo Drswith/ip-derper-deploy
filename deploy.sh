@@ -41,6 +41,7 @@ echo ">>> 配置信息收集"
 echo ""
 
 # 获取用户输入
+exec < /dev/tty
 read -p "请输入DERP服务端口 (默认33445): " DERP_PORT
 DERP_PORT=${DERP_PORT:-33445}
 
@@ -61,6 +62,7 @@ CLIENT_VERIFY=${CLIENT_VERIFY:-y}
 
 read -p "请选择镜像源 (1: 南大镜像源, 2: 默认源) [默认1]: " IMAGE_SOURCE
 IMAGE_SOURCE=${IMAGE_SOURCE:-1}
+exec <&-
 
 # 根据选择设置镜像（默认使用南大镜像源）
 if [ "$IMAGE_SOURCE" = "2" ]; then
@@ -254,8 +256,6 @@ cd $WORK_DIR
 
 # 创建docker-compose.yml文件
 cat > docker-compose.yml << EOF
-version: '3.8'
-
 services:
   derper:
     image: $DERPER_IMAGE
