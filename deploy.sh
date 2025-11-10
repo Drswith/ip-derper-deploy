@@ -41,28 +41,26 @@ echo ">>> 配置信息收集"
 echo ""
 
 # 获取用户输入
-exec < /dev/tty
-read -p "请输入DERP服务端口 (默认33445): " DERP_PORT
+read -p "请输入DERP服务端口 (默认33445): " DERP_PORT < /dev/tty
 DERP_PORT=${DERP_PORT:-33445}
 
-read -p "请输入HTTP端口 (默认80): " HTTP_PORT
+read -p "请输入HTTP端口 (默认80): " HTTP_PORT < /dev/tty
 HTTP_PORT=${HTTP_PORT:-80}
 
-read -p "请输入主机名或IP地址 (默认127.0.0.1): " DERP_HOST
+read -p "请输入主机名或IP地址 (默认127.0.0.1): " DERP_HOST < /dev/tty
 DERP_HOST=${DERP_HOST:-127.0.0.1}
 
-read -p "请输入证书目录 (默认/app/certs): " DERP_CERTS
+read -p "请输入证书目录 (默认/app/certs): " DERP_CERTS < /dev/tty
 DERP_CERTS=${DERP_CERTS:-/app/certs}
 
-read -p "是否启用STUN服务? (y/n, 默认y): " STUN_ENABLED
+read -p "是否启用STUN服务? (y/n, 默认y): " STUN_ENABLED < /dev/tty
 STUN_ENABLED=${STUN_ENABLED:-y}
 
-read -p "是否启用客户端验证? (y/n, 默认y): " CLIENT_VERIFY
+read -p "是否启用客户端验证? (y/n, 默认y): " CLIENT_VERIFY < /dev/tty
 CLIENT_VERIFY=${CLIENT_VERIFY:-y}
 
-read -p "请选择镜像源 (1: 南大镜像源, 2: 默认源) [默认1]: " IMAGE_SOURCE
+read -p "请选择镜像源 (1: 南大镜像源, 2: 默认源) [默认1]: " IMAGE_SOURCE < /dev/tty
 IMAGE_SOURCE=${IMAGE_SOURCE:-1}
-exec <&-
 
 # 根据选择设置镜像（默认使用南大镜像源）
 if [ "$IMAGE_SOURCE" = "2" ]; then
