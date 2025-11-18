@@ -62,6 +62,20 @@ CLIENT_VERIFY=${CLIENT_VERIFY:-y}
 read -p "请选择镜像源 (1: 南大镜像源, 2: 默认源) [默认1]: " IMAGE_SOURCE < /dev/tty
 IMAGE_SOURCE=${IMAGE_SOURCE:-1}
 
+read -p "是否禁用Tailscale防火墙规则(netfilter)? (阿里云必须禁用) (y/n, 默认n): " DISABLE_NETFILTER < /dev/tty
+DISABLE_NETFILTER=${DISABLE_NETFILTER:-n}
+
+read -p "是否禁用Magic DNS修改/etc/resolv.conf? (阿里云必须禁用) (y/n, 默认n): " DISABLE_MAGIC_DNS < /dev/tty
+DISABLE_MAGIC_DNS=${DISABLE_MAGIC_DNS:-n}
+
+read -p "是否接受其他节点的子网路由(accept-routes)? (y/n, 默认y): " ACCEPT_ROUTES < /dev/tty
+ACCEPT_ROUTES=${ACCEPT_ROUTES:-y}
+
+read -p "是否设置为出口节点(advertise-exit-node)? (y/n, 默认n): " ADVERTISE_EXIT_NODE < /dev/tty
+ADVERTISE_EXIT_NODE=${ADVERTISE_EXIT_NODE:-n}
+
+read -p "广告子网路由(例如192.168.0.0/24，留空不广告): " ADVERTISE_ROUTES < /dev/tty
+
 # 根据选择设置镜像（默认使用南大镜像源）
 if [ "$IMAGE_SOURCE" = "2" ]; then
   DERPER_IMAGE="ghcr.io/yangchuansheng/ip_derper:latest"
@@ -84,6 +98,30 @@ if [[ "$CLIENT_VERIFY" == "y" || "$CLIENT_VERIFY" == "Y" ]]; then
   DERP_VERIFY_CLIENTS="true"
 else
   DERP_VERIFY_CLIENTS="false"
+fi
+
+if [[ "$DISABLE_NETFILTER" == "y" || "$DISABLE_NETFILTER" == "Y" ]]; then
+  NETFILTER_MODE="off"
+else
+  NETFILTER_MODE="on"
+fi
+
+if [[ "$DISABLE_MAGIC_DNS" == "y" || "$DISABLE_MAGIC_DNS" == "Y" ]]; then
+  TS_ACCEPT_DNS="false"
+else
+  TS_ACCEPT_DNS="true"
+fi
+
+if [[ "$ACCEPT_ROUTES" == "y" || "$ACCEPT_ROUTES" == "Y" ]]; then
+  TS_ACCEPT_ROUTES="true"
+else
+  TS_ACCEPT_ROUTES="false"
+fi
+
+if [[ "$ADVERTISE_EXIT_NODE" == "y" || "$ADVERTISE_EXIT_NODE" == "Y" ]]; then
+  TS_ADVERTISE_EXIT_NODE="true"
+else
+  TS_ADVERTISE_EXIT_NODE="false"
 fi
 
 echo ""
@@ -231,6 +269,50 @@ else
   echo "Tailscale登录可能未完成，请手动运行 'tailscale login' 完成登录"
 fi
 
+TS_UP_FLAGS=""
+TS_UP_FLAGS="$TS_UP_FLAGS --netfilter-mode=$NETFILTER_MODE"
+if [ "$TS_ACCEPT_DNS" = "true" ]; then
+  TS_UP_FLAGS="$TS_UP_FLAGS --accept-dns=true"
+else
+  TS_UP_FLAGS="$TS_UP_FLAGS --accept-dns=false"
+fi
+if [ "$TS_ACCEPT_ROUTES" = "true" ]; then
+  TS_UP_FLAGS="$TS_UP_FLAGS --accept-routes=true"
+else
+  TS_UP_FLAGS="$TS_UP_FLAGS --accept-routes=false"
+fi
+if [ "$TS_ADVERTISE_EXIT_NODE" = "true" ]; then
+  TS_UP_FLAGS="$TS_UP_FLAGS --advertise-exit-node"
+fi
+if [ -n "$ADVERTISE_ROUTES" ]; then
+  TS_UP_FLAGS="$TS_UP_FLAGS --advertise-routes=$ADVERTISE_ROUTES"
+fi
+
+echo ""
+echo "正在应用Tailscale首选项"
+tailscale up $TS_UP_FLAGS || true
+
+if [ "$NETFILTER_MODE" = "off" ]; then
+  echo ""
+  echo "正在禁用Tailscale防火墙规则(netfilter)"
+  if command -v iptables >/dev/null 2>&1; then
+    if iptables -C INPUT -j ts-input >/dev/null 2>&1; then iptables -D INPUT -j ts-input || true; fi
+    if iptables -C FORWARD -j ts-forward >/dev/null 2>&1; then iptables -D FORWARD -j ts-forward || true; fi
+    iptables -F ts-input || true
+    iptables -X ts-input || true
+    iptables -F ts-forward || true
+    iptables -X ts-forward || true
+  fi
+  if command -v ip6tables >/dev/null 2>&1; then
+    if ip6tables -C INPUT -j ts-input >/dev/null 2>&1; then ip6tables -D INPUT -j ts-input || true; fi
+    if ip6tables -C FORWARD -j ts-forward >/dev/null 2>&1; then ip6tables -D FORWARD -j ts-forward || true; fi
+    ip6tables -F ts-input || true
+    ip6tables -X ts-input || true
+    ip6tables -F ts-forward || true
+    ip6tables -X ts-forward || true
+  fi
+fi
+
 echo ""
 echo "Step 6 完成"
 echo ""
@@ -253,6 +335,12 @@ chown $CURRENT_USER:$CURRENT_USER $WORK_DIR
 cd $WORK_DIR
 
 # 创建docker-compose.yml文件
+if [ "$DERP_STUN" = "true" ]; then
+  STUN_PORT_MAPPING='      - "3478:3478/udp"'
+else
+  STUN_PORT_MAPPING=''
+fi
+
 cat > docker-compose.yml << EOF
 services:
   derper:
@@ -262,7 +350,7 @@ services:
     ports:
       - "$DERP_PORT:$DERP_PORT" # DERP端口
       - "$HTTP_PORT:$HTTP_PORT" # HTTP端口
-      - "3478:3478/udp" # STUN端口
+$(printf "%s" "$STUN_PORT_MAPPING")
     volumes:
       - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
       - ./certs:$DERP_CERTS
@@ -306,6 +394,15 @@ echo "  - 主机名: $DERP_HOST"
 echo "  - 证书目录: $DERP_CERTS"
 echo "  - STUN服务: $DERP_STUN"
 echo "  - 客户端验证: $DERP_VERIFY_CLIENTS"
+if [ "$NETFILTER_MODE" = "off" ]; then
+echo "  - 已禁用Tailscale防火墙(netfilter)"
+fi
+echo "  - DNS管理: $TS_ACCEPT_DNS"
+echo "  - 接受子网路由: $TS_ACCEPT_ROUTES"
+echo "  - 出口节点: $TS_ADVERTISE_EXIT_NODE"
+if [ -n "$ADVERTISE_ROUTES" ]; then
+echo "  - 广告子网路由: $ADVERTISE_ROUTES"
+fi
 echo "工作目录: $WORK_DIR"
 echo ""
 echo "验证服务状态:"
