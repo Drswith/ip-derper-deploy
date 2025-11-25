@@ -1,0 +1,126 @@
+name: release-ip-derper
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tailscale 版本号，例如 1.90.8；留空表示使用最新版本"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 2 * * *"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: gcr.io
+      IMAGE_NAME: tailscale-ip-derper
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init
+        run: |
+          set -euo pipefail
+          echo "input.version=${{ github.event.inputs.version }}"
+          echo "REGISTRY=$REGISTRY"
+          echo "IMAGE_NAME=$IMAGE_NAME"
+          echo "GCP_PROJECT_ID=$GCP_PROJECT_ID"
+
+      - name: Source Fetch
+        run: |
+          set -euo pipefail
+          bash ./get-tailscale-release.sh
+
+      - name: Determine Version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="$(ls -d tailscale-* | head -n 1 | sed 's/tailscale-//')"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$VERSION"
+
+      - name: Source Verify
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          DIR="tailscale-$VERSION"
+          [ -d "$DIR" ] || { echo "missing $DIR"; exit 1; }
+          [ -d "$DIR/cmd/derper" ] || { echo "missing derper"; exit 1; }
+          [ -f "$DIR/go.mod" ] || { echo "missing go.mod"; exit 1; }
+          printf "source ok: %s\n" "$DIR"
+
+      - name: Source Patch
+        run: |
+          set -euo pipefail
+          bash ./patch-source.sh
+
+      - name: Patch Verify
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          DIR="tailscale-$VERSION"
+          if grep -Rq 'disabled: skip' "$DIR/cmd/derper"; then
+            echo "patch ok"
+          else
+            echo "patch not applied"
+            exit 1
+          fi
+
+      - name: Docker Login GCR
+        uses: docker/login-action@v3
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GCR_SERVICE_ACCOUNT_KEY }}
+
+      - name: Docker Build
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          docker build --build-arg VERSION="$VERSION" --build-arg TAILSCALE_DIR="tailscale-$VERSION" -t "$IMAGE_NAME:$VERSION" .
+
+      - name: Docker Tag
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          docker tag "$IMAGE_NAME:$VERSION" "$IMAGE_NAME:v$VERSION"
+          docker tag "$IMAGE_NAME:$VERSION" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$VERSION"
+          docker tag "$IMAGE_NAME:$VERSION" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:v$VERSION"
+
+      - name: Docker Push
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$VERSION"
+          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:v$VERSION"
+
+      - name: Push Verify
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$VERSION"
+          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:v$VERSION"
+
+      - name: Create Git Tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          TAG="v$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GH_REPO.git" "$TAG"
