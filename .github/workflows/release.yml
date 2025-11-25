@@ -47,14 +47,19 @@ jobs:
           else
             VERSION="$(ls -d tailscale-* | head -n 1 | sed 's/tailscale-//')"
           fi
+          RAW="${VERSION#v}"
+          TAG="v${RAW}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_raw=$RAW" >> "$GITHUB_OUTPUT"
+          echo "version_tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "VERSION=$VERSION"
+          echo "RAW=$RAW"
+          echo "TAG=$TAG"
 
       - name: Source Verify
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          DIR="tailscale-$VERSION"
+          DIR="tailscale-${{ steps.ver.outputs.version_tag }}"
           [ -d "$DIR" ] || { echo "missing $DIR"; exit 1; }
           [ -d "$DIR/cmd/derper" ] || { echo "missing derper"; exit 1; }
           [ -f "$DIR/go.mod" ] || { echo "missing go.mod"; exit 1; }
@@ -68,8 +73,7 @@ jobs:
       - name: Patch Verify
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          DIR="tailscale-$VERSION"
+          DIR="tailscale-${{ steps.ver.outputs.version_tag }}"
           if grep -Rq 'disabled: skip' "$DIR/cmd/derper"; then
             echo "patch ok"
           else
@@ -87,30 +91,34 @@ jobs:
       - name: Docker Build
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          docker build --build-arg VERSION="$VERSION" --build-arg TAILSCALE_DIR="tailscale-$VERSION" -t "$IMAGE_NAME:$VERSION" .
+          RAW="${{ steps.ver.outputs.version_raw }}"
+          TAG="${{ steps.ver.outputs.version_tag }}"
+          docker build --build-arg VERSION="$RAW" --build-arg TAILSCALE_DIR="tailscale-$TAG" -t "$IMAGE_NAME:$RAW" .
 
       - name: Docker Tag
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          docker tag "$IMAGE_NAME:$VERSION" "$IMAGE_NAME:v$VERSION"
-          docker tag "$IMAGE_NAME:$VERSION" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$VERSION"
-          docker tag "$IMAGE_NAME:$VERSION" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:v$VERSION"
+          RAW="${{ steps.ver.outputs.version_raw }}"
+          TAG="${{ steps.ver.outputs.version_tag }}"
+          docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:$TAG"
+          docker tag "$IMAGE_NAME:$RAW" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$RAW"
+          docker tag "$IMAGE_NAME:$RAW" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$TAG"
 
       - name: Docker Push
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$VERSION"
-          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:v$VERSION"
+          RAW="${{ steps.ver.outputs.version_raw }}"
+          TAG="${{ steps.ver.outputs.version_tag }}"
+          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$RAW"
+          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$TAG"
 
       - name: Push Verify
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$VERSION"
-          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:v$VERSION"
+          RAW="${{ steps.ver.outputs.version_raw }}"
+          TAG="${{ steps.ver.outputs.version_tag }}"
+          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$RAW"
+          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$TAG"
 
       - name: Create Git Tag
         if: github.event_name == 'workflow_dispatch'
@@ -118,8 +126,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          TAG="v$VERSION"
+          TAG="${{ steps.ver.outputs.version_tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" -m "$TAG"
