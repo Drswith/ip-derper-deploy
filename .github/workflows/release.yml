@@ -33,11 +33,6 @@ jobs:
           echo "IMAGE_NAME=$IMAGE_NAME"
           echo "GCP_PROJECT_ID=$GCP_PROJECT_ID"
 
-      - name: Source Fetch
-        run: |
-          set -euo pipefail
-          bash ./get-tailscale-release.sh "${{ github.event.inputs.version }}"
-
       - name: Determine Version
         id: ver
         run: |
@@ -55,7 +50,13 @@ jobs:
           echo "VERSION=$VERSION"
           echo "RAW=$RAW"
           echo "TAG=$TAG"
-
+      
+      - name: Source Fetch
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          bash ./get-tailscale-release.sh "$VERSION"
+      
       - name: Source Verify
         run: |
           set -euo pipefail
