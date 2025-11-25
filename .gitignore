@@ -1,0 +1,8 @@
+.DS_Store
+*.local
+dist
+.idea/
+*.log
+
+tailscale*.tar.gz
+tailscale*/
