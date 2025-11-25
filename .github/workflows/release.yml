@@ -54,7 +54,7 @@ jobs:
       - name: Source Fetch
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
+          VERSION="${{ steps.ver.outputs.version_tag }}"
           bash ./get-tailscale-release.sh "$VERSION"
       
       - name: Source Verify
