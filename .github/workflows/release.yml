@@ -36,7 +36,7 @@ jobs:
       - name: Source Fetch
         run: |
           set -euo pipefail
-          bash ./get-tailscale-release.sh
+          bash ./get-tailscale-release.sh "${{ github.event.inputs.version }}"
 
       - name: Determine Version
         id: ver

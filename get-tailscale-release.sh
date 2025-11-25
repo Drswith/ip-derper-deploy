@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 GITHUB_GIT_URL=${GITHUB_GIT_URL:-"https://github.com"}
 REPO_URL="${GITHUB_GIT_URL%/}/tailscale/tailscale.git"
@@ -9,6 +10,7 @@ else
 fi
 log() { local level="$1"; shift; local color=""; case "$level" in INFO) color="$CYAN";; WARN) color="$YELLOW";; ERROR) color="$RED";; OK) color="$GREEN";; esac; printf "%s %b[%s]%b %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$color" "$level" "$RESET" "$*"; }
 log INFO "开始获取 Tailscale 版本列表..."
+REQUESTED_VERSION=${1:-${VERSION:-}}
 latest_url=$(curl -sL -o /dev/null -w '%{url_effective}' "https://github.com/tailscale/tailscale/releases/latest")
 latest_version=${latest_url##*/}
 if command -v git >/dev/null 2>&1; then
@@ -21,8 +23,21 @@ if command -v git >/dev/null 2>&1; then
   if [ -z "$latest_version" ]; then
     latest_version=$(echo "$tags" | tail -n 1)
   fi
+  if [ -n "$REQUESTED_VERSION" ]; then
+    if echo "$tags" | grep -Fxq "$REQUESTED_VERSION"; then
+      latest_version="$REQUESTED_VERSION"
+      log OK "使用指定版本: $latest_version"
+    else
+      log ERROR "指定版本不存在: $REQUESTED_VERSION"
+      exit 1
+    fi
+  fi
 else
   latest_versions="$latest_version"
+  if [ -n "$REQUESTED_VERSION" ]; then
+    latest_version="$REQUESTED_VERSION"
+    log INFO "未检测到 git，按指定版本尝试下载: $latest_version"
+  fi
 fi
 
 log INFO "最近的 10个 Tailscale 版本"
