@@ -21,23 +21,23 @@ ENV DERP_ADDR :443
 ENV DERP_HTTP_PORT 80
 ENV DERP_HOST=127.0.0.1
 ENV DERP_CERTS=/app/certs/
-ENV DERP_STUN true
-ENV DERP_VERIFY_CLIENTS false
+ENV DERP_STUN=true
+ENV DERP_VERIFY_CLIENTS=false
 # ==========================
 
 # apt
 RUN apt-get update && \
     apt-get install -y openssl curl
 
+# 复制脚本和证书生成工具
 COPY build-cert.sh /app/
+COPY entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh /app/build-cert.sh
+
+# 从 builder 阶段复制二进制
 COPY --from=builder /app/derper /app/derper
 
-# build self-signed certs && start derper
-CMD bash /app/build-cert.sh $DERP_HOST $DERP_CERTS /app/san.conf && \
-    /app/derper --hostname=$DERP_HOST \
-    --certmode=manual \
-    --certdir=$DERP_CERTS \
-    --stun=$DERP_STUN  \
-    --a=$DERP_ADDR \
-    --http-port=$DERP_HTTP_PORT \
-    --verify-clients=$DERP_VERIFY_CLIENTS
+# 设置入口点
+ENTRYPOINT ["/app/entrypoint.sh"]
+# 默认无参数，由 entrypoint.sh 决定是否使用默认值
+CMD []
