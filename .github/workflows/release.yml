@@ -135,6 +135,8 @@ jobs:
           docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:$TAG"
           docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$RAW"
           docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$TAG"
+          docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:latest"
+          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:latest"
 
       - name: Docker Push
         run: |
@@ -144,6 +146,7 @@ jobs:
           NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker push "ghcr.io/$NS/$IMAGE_NAME:$RAW"
           docker push "ghcr.io/$NS/$IMAGE_NAME:$TAG"
+          docker push "ghcr.io/$NS/$IMAGE_NAME:latest"
 
       - name: Push Verify
         run: |
@@ -153,3 +156,4 @@ jobs:
           NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker pull "ghcr.io/$NS/$IMAGE_NAME:$RAW"
           docker pull "ghcr.io/$NS/$IMAGE_NAME:$TAG"
+          docker pull "ghcr.io/$NS/$IMAGE_NAME:latest"
