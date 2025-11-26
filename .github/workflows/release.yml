@@ -26,15 +26,21 @@ jobs:
           set -euo pipefail
           echo "input.version=${{ github.event.inputs.version }}"
 
+      - name: Source Fetch
+        run: |
+          set -euo pipefail
+          bash ./get-tailscale-release.sh "${{ github.event.inputs.version }}"
+
       - name: Determine Version
         id: ver
         run: |
           set -euo pipefail
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="$(ls -d tailscale-* 2>/dev/null | head -n 1 | sed 's/tailscale-//')"
+          DIRS=$(ls -d tailscale-* 2>/dev/null || true)
+          if [ -z "$DIRS" ]; then
+            echo "no tailscale-* directories found"
+            exit 1
           fi
+          VERSION=$(echo "$DIRS" | sort -V | tail -n 1 | sed 's/^tailscale-//')
           RAW="${VERSION#v}"
           TAG="v${RAW}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -43,11 +49,6 @@ jobs:
           echo "VERSION=$VERSION"
           echo "RAW=$RAW"
           echo "TAG=$TAG"
-
-      - name: Source Fetch
-        run: |
-          set -euo pipefail
-          bash ./get-tailscale-release.sh "${{ steps.ver.outputs.version_tag }}"
 
       - name: Source Verify
         run: |
