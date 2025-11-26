@@ -41,8 +41,8 @@ echo ">>> 配置信息收集"
 echo ""
 
 # 获取用户输入
-read -p "请输入DERP服务端口 (默认33445): " DERP_PORT < /dev/tty
-DERP_PORT=${DERP_PORT:-33445}
+read -p "请输入DERP服务端口 (默认52625): " DERP_PORT < /dev/tty
+DERP_PORT=${DERP_PORT:-52625}
 
 read -p "请输入HTTP端口 (默认80): " HTTP_PORT < /dev/tty
 HTTP_PORT=${HTTP_PORT:-80}
@@ -78,11 +78,11 @@ read -p "广告子网路由(例如192.168.0.0/24，留空不广告): " ADVERTISE
 
 # 根据选择设置镜像（默认使用南大镜像源）
 if [ "$IMAGE_SOURCE" = "2" ]; then
-  DERPER_IMAGE="ghcr.io/yangchuansheng/ip_derper:latest"
+  DERPER_IMAGE="ghcr.io/drswith/tailscale-ip-derper:latest"
   echo ""
   echo "使用默认镜像源: $DERPER_IMAGE"
 else
-  DERPER_IMAGE="ghcr.nju.edu.cn/yangchuansheng/ip_derper:latest"
+  DERPER_IMAGE="ghcr.nju.edu.cn/drswith/tailscale-ip-derper:latest"
   echo ""
   echo "使用南大镜像源: $DERPER_IMAGE (默认)"
 fi
