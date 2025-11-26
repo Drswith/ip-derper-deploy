@@ -1,10 +1,10 @@
-name: release-ip-derper
+name: release-derper-ubuntu
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Tailscale 版本号，例如 1.90.8；留空表示使用最新版本"
+        description: "Tailscale 版本号，例如 1.90.8；留空表示最新版本"
         required: false
         default: ""
   schedule:
@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   prepare:
@@ -95,13 +94,13 @@ jobs:
       version_raw: ${{ steps.ver.outputs.version_raw }}
       version_tag: ${{ steps.ver.outputs.version_tag }}
 
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     needs: prepare
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: tailscale-ip-derper
-      GHCR_NAMESPACE: ${{ github.repository_owner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -112,48 +111,79 @@ jobs:
           name: tailscale-src
           path: .
 
-      - name: Docker Login GHCR
-        uses: docker/login-action@v3
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          go-version: '1.22'
 
-      - name: Docker Build
+      - name: Show Go env
+        run: |
+          set -euo pipefail
+          go env
+
+      - name: Build derper (linux/${{ matrix.arch }})
         run: |
           set -euo pipefail
           RAW="${{ needs.prepare.outputs.version_raw }}"
-          TAG="${{ needs.prepare.outputs.version_tag }}"
-          docker build --build-arg VERSION="$RAW" --build-arg TAILSCALE_DIR="tailscale" -t "$IMAGE_NAME:$RAW" .
+          mkdir -p dist
+          pushd tailscale/cmd/derper
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags "-s -w" -o ../../dist/derper-linux-${{ matrix.arch }}
+          popd
+          cp LICENSE dist/ || true
+          cp README.md dist/ || true
 
-      - name: Docker Tag
+      - name: Package (linux/${{ matrix.arch }})
         run: |
           set -euo pipefail
           RAW="${{ needs.prepare.outputs.version_raw }}"
-          TAG="${{ needs.prepare.outputs.version_tag }}"
-          NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
-          docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:$TAG"
-          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$RAW"
-          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$TAG"
-          docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:latest"
-          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:latest"
+          cp dist/derper-linux-${{ matrix.arch }} dist/derper
+          tar -C dist -czf dist/derper_${RAW}_linux_${{ matrix.arch }}.tar.gz derper LICENSE README.md || tar -C dist -czf dist/derper_${RAW}_linux_${{ matrix.arch }}.tar.gz derper
+          rm -f dist/derper
+          (cd dist && sha256sum derper_${RAW}_linux_${{ matrix.arch }}.tar.gz derper-linux-${{ matrix.arch }} > SHA256SUMS_${{ matrix.arch }}.txt)
 
-      - name: Docker Push
+      - name: Upload Artifacts (linux/${{ matrix.arch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: derper-${{ needs.prepare.outputs.version_raw }}-linux-${{ matrix.arch }}
+          path: |
+            dist/derper_${{ needs.prepare.outputs.version_raw }}_linux_${{ matrix.arch }}.tar.gz
+            dist/derper-linux-${{ matrix.arch }}
+            dist/SHA256SUMS_${{ matrix.arch }}.txt
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [prepare, build]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: derper-*
+          path: release
+
+      - name: Aggregate checksums
         run: |
           set -euo pipefail
           RAW="${{ needs.prepare.outputs.version_raw }}"
-          TAG="${{ needs.prepare.outputs.version_tag }}"
-          NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
-          docker push "ghcr.io/$NS/$IMAGE_NAME:$RAW"
-          docker push "ghcr.io/$NS/$IMAGE_NAME:$TAG"
-          docker push "ghcr.io/$NS/$IMAGE_NAME:latest"
+          find release -type f -name "SHA256SUMS_*.txt" -exec cat {} \; > release/derper_${RAW}_SHA256SUMS.txt
+          ls -l release
 
-      - name: Push Verify
-        run: |
-          set -euo pipefail
-          RAW="${{ needs.prepare.outputs.version_raw }}"
-          TAG="${{ needs.prepare.outputs.version_tag }}"
-          NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
-          docker pull "ghcr.io/$NS/$IMAGE_NAME:$RAW"
-          docker pull "ghcr.io/$NS/$IMAGE_NAME:$TAG"
-          docker pull "ghcr.io/$NS/$IMAGE_NAME:latest"
+      - name: Upload combined artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: derper-${{ needs.prepare.outputs.version_raw }}-artifacts
+          path: release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: derper-${{ needs.prepare.outputs.version_raw }}
+          name: derper ${{ needs.prepare.outputs.version_raw }}
+          draft: false
+          prerelease: false
+          files: |
+            release/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
