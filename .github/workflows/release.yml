@@ -109,7 +109,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tailscale-src
-          path: .
+          path: source
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -126,8 +126,16 @@ jobs:
           set -euo pipefail
           RAW="${{ needs.prepare.outputs.version_raw }}"
           mkdir -p dist
-          pushd tailscale/cmd/derper
-          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags "-s -w" -o ../../dist/derper-linux-${{ matrix.arch }}
+          DERPER_DIR=$(find source -type d -path "*/cmd/derper" | head -n 1)
+          if [ -z "$DERPER_DIR" ]; then
+            echo "未找到 derper 源码目录，当前目录结构如下："
+            ls -R source || true
+            exit 1
+          fi
+          echo "使用 derper 源码目录: $DERPER_DIR"
+          OUT="${GITHUB_WORKSPACE}/dist/derper-linux-${{ matrix.arch }}"
+          pushd "$DERPER_DIR"
+          GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags "-s -w" -o "$OUT"
           popd
           cp LICENSE dist/ || true
           cp README.md dist/ || true
