@@ -15,12 +15,8 @@ permissions:
   packages: write
 
 jobs:
-  build-and-push:
+  prepare:
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: tailscale-ip-derper
-      GHCR_NAMESPACE: ${{ github.repository_owner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,9 +25,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "input.version=${{ github.event.inputs.version }}"
-          echo "REGISTRY=$REGISTRY"
-          echo "IMAGE_NAME=$IMAGE_NAME"
-          echo "GHCR_NAMESPACE=$GHCR_NAMESPACE"
 
       - name: Determine Version
         id: ver
@@ -40,7 +33,7 @@ jobs:
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION="$(ls -d tailscale-* | head -n 1 | sed 's/tailscale-//')"
+            VERSION="$(ls -d tailscale-* 2>/dev/null | head -n 1 | sed 's/tailscale-//')"
           fi
           RAW="${VERSION#v}"
           TAG="v${RAW}"
@@ -50,13 +43,12 @@ jobs:
           echo "VERSION=$VERSION"
           echo "RAW=$RAW"
           echo "TAG=$TAG"
-      
+
       - name: Source Fetch
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version_tag }}"
-          bash ./get-tailscale-release.sh "$VERSION"
-      
+          bash ./get-tailscale-release.sh "${{ steps.ver.outputs.version_tag }}"
+
       - name: Source Verify
         run: |
           set -euo pipefail
@@ -82,6 +74,33 @@ jobs:
             exit 1
           fi
 
+      - name: Upload Source Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tailscale-src
+          path: tailscale-${{ steps.ver.outputs.version_tag }}
+
+    outputs:
+      version_raw: ${{ steps.ver.outputs.version_raw }}
+      version_tag: ${{ steps.ver.outputs.version_tag }}
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: prepare
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: tailscale-ip-derper
+      GHCR_NAMESPACE: ${{ github.repository_owner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Source Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tailscale-src
+          path: .
+
       - name: Docker Login GHCR
         uses: docker/login-action@v3
         with:
@@ -92,15 +111,15 @@ jobs:
       - name: Docker Build
         run: |
           set -euo pipefail
-          RAW="${{ steps.ver.outputs.version_raw }}"
-          TAG="${{ steps.ver.outputs.version_tag }}"
+          RAW="${{ needs.prepare.outputs.version_raw }}"
+          TAG="${{ needs.prepare.outputs.version_tag }}"
           docker build --build-arg VERSION="$RAW" --build-arg TAILSCALE_DIR="tailscale-$TAG" -t "$IMAGE_NAME:$RAW" .
 
       - name: Docker Tag
         run: |
           set -euo pipefail
-          RAW="${{ steps.ver.outputs.version_raw }}"
-          TAG="${{ steps.ver.outputs.version_tag }}"
+          RAW="${{ needs.prepare.outputs.version_raw }}"
+          TAG="${{ needs.prepare.outputs.version_tag }}"
           NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:$TAG"
           docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$RAW"
@@ -109,8 +128,8 @@ jobs:
       - name: Docker Push
         run: |
           set -euo pipefail
-          RAW="${{ steps.ver.outputs.version_raw }}"
-          TAG="${{ steps.ver.outputs.version_tag }}"
+          RAW="${{ needs.prepare.outputs.version_raw }}"
+          TAG="${{ needs.prepare.outputs.version_tag }}"
           NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker push "ghcr.io/$NS/$IMAGE_NAME:$RAW"
           docker push "ghcr.io/$NS/$IMAGE_NAME:$TAG"
@@ -118,19 +137,25 @@ jobs:
       - name: Push Verify
         run: |
           set -euo pipefail
-          RAW="${{ steps.ver.outputs.version_raw }}"
-          TAG="${{ steps.ver.outputs.version_tag }}"
+          RAW="${{ needs.prepare.outputs.version_raw }}"
+          TAG="${{ needs.prepare.outputs.version_tag }}"
           NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker pull "ghcr.io/$NS/$IMAGE_NAME:$RAW"
           docker pull "ghcr.io/$NS/$IMAGE_NAME:$TAG"
 
+  create-git-tag:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Create Git Tag
-        if: github.event_name == 'workflow_dispatch'
         env:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          TAG="${{ steps.ver.outputs.version_tag }}"
+          TAG="${{ needs.prepare.outputs.version_tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "$TAG" -m "$TAG"
