@@ -1,8 +1,8 @@
 FROM golang:latest AS builder
 
 WORKDIR /app
-ARG TAILSCALE_DIR=tailscale-*/
-ADD ${TAILSCALE_DIR} /app/tailscale
+
+ADD tailscale  /app/tailscale
 
 # build modified derper
 RUN cd /app/tailscale/cmd/derper && \
