@@ -101,25 +101,28 @@ jobs:
           set -euo pipefail
           RAW="${{ steps.ver.outputs.version_raw }}"
           TAG="${{ steps.ver.outputs.version_tag }}"
+          NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:$TAG"
-          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$RAW"
-          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$TAG"
+          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$RAW"
+          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$NS/$IMAGE_NAME:$TAG"
 
       - name: Docker Push
         run: |
           set -euo pipefail
           RAW="${{ steps.ver.outputs.version_raw }}"
           TAG="${{ steps.ver.outputs.version_tag }}"
-          docker push "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$RAW"
-          docker push "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$TAG"
+          NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
+          docker push "ghcr.io/$NS/$IMAGE_NAME:$RAW"
+          docker push "ghcr.io/$NS/$IMAGE_NAME:$TAG"
 
       - name: Push Verify
         run: |
           set -euo pipefail
           RAW="${{ steps.ver.outputs.version_raw }}"
           TAG="${{ steps.ver.outputs.version_tag }}"
-          docker pull "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$RAW"
-          docker pull "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$TAG"
+          NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
+          docker pull "ghcr.io/$NS/$IMAGE_NAME:$RAW"
+          docker pull "ghcr.io/$NS/$IMAGE_NAME:$TAG"
 
       - name: Create Git Tag
         if: github.event_name == 'workflow_dispatch'
