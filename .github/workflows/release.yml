@@ -18,9 +18,9 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     env:
-      REGISTRY: gcr.io
+      REGISTRY: ghcr.io
       IMAGE_NAME: tailscale-ip-derper
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GHCR_NAMESPACE: ${{ github.repository_owner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
           echo "input.version=${{ github.event.inputs.version }}"
           echo "REGISTRY=$REGISTRY"
           echo "IMAGE_NAME=$IMAGE_NAME"
-          echo "GCP_PROJECT_ID=$GCP_PROJECT_ID"
+          echo "GHCR_NAMESPACE=$GHCR_NAMESPACE"
 
       - name: Determine Version
         id: ver
@@ -82,12 +82,12 @@ jobs:
             exit 1
           fi
 
-      - name: Docker Login GCR
+      - name: Docker Login GHCR
         uses: docker/login-action@v3
         with:
-          registry: gcr.io
-          username: _json_key
-          password: ${{ secrets.GCR_SERVICE_ACCOUNT_KEY }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Build
         run: |
@@ -102,24 +102,24 @@ jobs:
           RAW="${{ steps.ver.outputs.version_raw }}"
           TAG="${{ steps.ver.outputs.version_tag }}"
           docker tag "$IMAGE_NAME:$RAW" "$IMAGE_NAME:$TAG"
-          docker tag "$IMAGE_NAME:$RAW" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$RAW"
-          docker tag "$IMAGE_NAME:$RAW" "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$TAG"
+          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$RAW"
+          docker tag "$IMAGE_NAME:$RAW" "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$TAG"
 
       - name: Docker Push
         run: |
           set -euo pipefail
           RAW="${{ steps.ver.outputs.version_raw }}"
           TAG="${{ steps.ver.outputs.version_tag }}"
-          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$RAW"
-          docker push "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$TAG"
+          docker push "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$RAW"
+          docker push "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$TAG"
 
       - name: Push Verify
         run: |
           set -euo pipefail
           RAW="${{ steps.ver.outputs.version_raw }}"
           TAG="${{ steps.ver.outputs.version_tag }}"
-          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$RAW"
-          docker pull "gcr.io/$GCP_PROJECT_ID/$IMAGE_NAME:$TAG"
+          docker pull "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$RAW"
+          docker pull "ghcr.io/$GHCR_NAMESPACE/$IMAGE_NAME:$TAG"
 
       - name: Create Git Tag
         if: github.event_name == 'workflow_dispatch'
