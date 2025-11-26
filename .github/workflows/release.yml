@@ -26,29 +26,39 @@ jobs:
           set -euo pipefail
           echo "input.version=${{ github.event.inputs.version }}"
 
-      - name: Source Fetch
-        run: |
-          set -euo pipefail
-          bash ./get-tailscale-release.sh "${{ github.event.inputs.version }}"
-
       - name: Determine Version
         id: ver
-        run: |
-          set -euo pipefail
-          DIRS=$(ls -d tailscale-* 2>/dev/null || true)
-          if [ -z "$DIRS" ]; then
-            echo "no tailscale-* directories found"
-            exit 1
-          fi
-          VERSION=$(echo "$DIRS" | sort -V | tail -n 1 | sed 's/^tailscale-//')
-          RAW="${VERSION#v}"
-          TAG="v${RAW}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "version_raw=$RAW" >> "$GITHUB_OUTPUT"
-          echo "version_tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "VERSION=$VERSION"
-          echo "RAW=$RAW"
-          echo "TAG=$TAG"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const input = (context.payload.inputs && context.payload.inputs.version) || "";
+            let tag = input.trim();
+            if (tag && !tag.startsWith("v")) tag = `v${tag}`;
+            if (tag) {
+              try {
+                await github.rest.git.getRef({ owner: "tailscale", repo: "tailscale", ref: `tags/${tag}` });
+              } catch (e) {
+                core.setFailed(`指定版本不存在: ${tag}`);
+                return;
+              }
+            } else {
+              const latest = await github.rest.repos.getLatestRelease({ owner: "tailscale", repo: "tailscale" });
+              tag = latest.data.tag_name;
+            }
+            const raw = tag.startsWith("v") ? tag.slice(1) : tag;
+            core.setOutput("version_tag", tag);
+            core.setOutput("version_raw", raw);
+            core.info(`VERSION_TAG=${tag}`);
+            core.info(`VERSION_RAW=${raw}`);
+
+      - name: Source Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: tailscale/tailscale
+          ref: ${{ steps.ver.outputs.version_tag }}
+          path: tailscale-${{ steps.ver.outputs.version_tag }}
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Source Verify
         run: |
