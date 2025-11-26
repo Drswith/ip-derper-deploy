@@ -1,25 +1,27 @@
 # ip-derper-deploy
-ubuntu 一键部署 tailscale derp中继服务器脚本
+Ubuntu 一键部署 Tailscale DERP 中继服务器脚本
 
 ## 使用方法
 
 ### 快速部署
-```bash
-# curl 一键部署命令
-curl -fsSL https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | bash
-```
-```bash
-# curl 镜像加速
-curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | bash
-```
 
+#### curl 一键部署
+ - 源脚本
 ```bash
-# wget 一键部署命令
-wget -O deploy.sh https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh
+curl -fsSL https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | sudo bash
 ```
+ - 镜像加速
 ```bash
-# wget 镜像加速
-wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && ./deploy.sh
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh | sudo bash
+```
+#### wget 一键部署
+ - 源脚本
+```bash
+wget -O deploy.sh https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && sudo bash deploy.sh
+```
+ - 镜像加速
+```bash
+wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith/ip-derper-deploy/main/deploy.sh && chmod +x deploy.sh && sudo bash deploy.sh
 ```
 
 ### 系统要求
@@ -29,22 +31,25 @@ wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith
 
 ### 前置准备
 - 打开服务器所属的防火墙，允许脚本配置的端口和协议通行
-  - DERP服务端口 默认 52625（tcp）
-  - HTTP端口 默认 80 （tcp）
-  - STUN端口 默认 3478、41641 （udp）
+  - DERP 服务端口 默认 52625（TCP）
+  - HTTP 端口 默认 80 （TCP）
+  - STUN 端口 默认 3478、41641 （UDP）
 
-- 警告：使用阿里云web控制台连接服务器时由于内网服务IP段与tailscale使用的IP网段冲突，会配置到中途失去响应。
-  - 解决方法：使用其他ssh工具连接到服务器执行脚本配置即可。
+- 使用阿里云 Web 控制台连接服务器时，因内网 IP 段可能与 Tailscale IP 段冲突，配置中途可能失去响应。
+  - 解决方法：使用其他 SSH 工具连接到服务器执行脚本配置即可。
+
+### 权限说明
+- 脚本会安装软件包、写入 `/usr/local/bin` 和 `/etc/systemd/system`，需要 root 权限。
+- 若看到“请以 root 或使用 sudo 运行此脚本”，请按以上命令使用 `sudo` 执行。
 
 ### 部署流程
 脚本将自动完成以下步骤：
-1. 系统环境检查（root权限、apt包管理器）
+1. 系统环境检查（root 权限、apt 包管理器）
 2. 收集配置信息（端口、主机名、证书目录等）
-3. 安装 Docker（如未安装）
-4. 安装并登录 Tailscale
-5. 拉取 DERPER 镜像
-6. 创建 docker-compose.yml 配置文件
-7. 启动 DERP 服务
+3. 安装并登录 Tailscale
+4. 从 GitHub Release 下载 derper 构建产物并进行 SHA256 校验
+5. 安装二进制到 `/usr/local/bin`，配置为 systemd 服务
+6. 启动 DERP 服务并输出日志与状态信息
 
 ## 参考文档
 https://blog.sleepstars.net/archives/ji-yu-docker-compose
