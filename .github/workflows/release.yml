@@ -142,21 +142,3 @@ jobs:
           NS=$(echo "$GHCR_NAMESPACE" | tr '[:upper:]' '[:lower:]')
           docker pull "ghcr.io/$NS/$IMAGE_NAME:$RAW"
           docker pull "ghcr.io/$NS/$IMAGE_NAME:$TAG"
-
-  create-git-tag:
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Create Git Tag
-        env:
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          TAG="${{ needs.prepare.outputs.version_tag }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "$TAG"
-          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GH_REPO.git" "$TAG"
