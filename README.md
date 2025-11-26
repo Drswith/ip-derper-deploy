@@ -29,7 +29,7 @@ wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith
 
 ### 前置准备
 - 打开服务器所属的防火墙，允许脚本配置的端口和协议通行
-  - DERP服务端口 默认 33445、33446 （tcp）
+  - DERP服务端口 默认 52625（tcp）
   - HTTP端口 默认 80 （tcp）
   - STUN端口 默认 3478、41641 （udp）
 
@@ -48,7 +48,9 @@ wget -O deploy.sh https://gh-proxy.com/https://raw.githubusercontent.com/Drswith
 
 ## 参考文档
 https://blog.sleepstars.net/archives/ji-yu-docker-compose
+
 https://sspai.com/post/89200
+
 https://zhuanlan.zhihu.com/p/638910565
 
 ## 参考仓库
